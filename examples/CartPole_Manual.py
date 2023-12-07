@@ -68,17 +68,17 @@ def simulate(env, max_steps):
         binnedObs = (sigmoid(obs * obsSquashScale) * (obsColumnSize - 1) + 0.5).astype(np.int32).ravel().tolist()
 
         predictions = h.getPredictionCs(1)
-        h.step(cs, [ binnedObs, predictions ], True, 0.0)
+        h.step(cs, [ binnedObs, predictions ], True, 1/max_steps)
 
         # Retrieve the action, the hierarchy already automatically applied exploration
         action = predictions[0] # First and only column
 
-        obs, _reward, done, truncated, info = env.step(action)
+        obs, _reward, terminated, truncated, info = env.step(action)
 
-        # Re-define reward so that it is 0 normally and then -1 if done
-        if done:
-            binnedObs = (sigmoid(obs * obsSquashScale) * (obsColumnSize - 1) + 0.5).astype(np.int32).ravel().tolist()
-            h.step(cs, [ binnedObs, h.getPredictionCs(1) ], True, -1.0)
+        # punish (-1.0) when terminated
+        if terminated:
+            #binnedObs = (sigmoid(obs * obsSquashScale) * (obsColumnSize - 1) + 0.5).astype(np.int32).ravel().tolist()
+            h.step(cs, [ binnedObs, action ], True, -1.0)
 
             print("Episode {} finished after {} timesteps".format(episode + 1, t + 1))
             break

@@ -61,32 +61,26 @@ h = pyogmaneo.Hierarchy(cs, [ pyogmaneo.Int3(1, numObs, obsColumnSize), pyogmane
 
 def simulate(env, max_steps):
     obs = env.reset()[0]
-    predictions = (0,)
 
     # Timesteps
     for t in range(max_steps):
         # Bin the 4 observations. Since we don't know the limits of the observation, we just squash it
         binnedObs = (sigmoid(obs * obsSquashScale) * (obsColumnSize - 1) + 0.5).astype(np.int32).ravel().tolist()
 
+        predictions = h.getPredictionCs(1)
+        h.step(cs, [ binnedObs, predictions ], True, 0.0)
 
         # Retrieve the action, the hierarchy already automatically applied exploration
         action = predictions[0] # First and only column
 
-        obs, reward, done, truncated, info = env.step(action)
+        obs, _reward, done, truncated, info = env.step(action)
 
         # Re-define reward so that it is 0 normally and then -1 if done
         if done:
-            reward = -1.0
+            binnedObs = (sigmoid(obs * obsSquashScale) * (obsColumnSize - 1) + 0.5).astype(np.int32).ravel().tolist()
+            h.step(cs, [ binnedObs, h.getPredictionCs(1) ], True, -1.0)
 
             print("Episode {} finished after {} timesteps".format(episode + 1, t + 1))
-
-        else:
-            reward = 0.0
-
-        predictions = h.getPredictionCs(1)
-        h.step(cs, [ binnedObs, predictions ], True, reward)
-
-        if done:
             break
 
 for episode in range(10000):

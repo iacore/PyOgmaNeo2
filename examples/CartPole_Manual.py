@@ -58,22 +58,21 @@ for i in range(2): # Layers with exponential memory. Not much memory is needed f
 # Create the hierarchy: Provided with input layer sizes (a single column in this case), and input types (a single predicted layer)
 h = pyogmaneo.Hierarchy(cs, [ pyogmaneo.Int3(1, numObs, obsColumnSize), pyogmaneo.Int3(1, 1, numActions) ], [ pyogmaneo.inputTypeNone, pyogmaneo.inputTypeAction ], lds)
 
-reward = 0.0
 
-for episode in range(1000):
-    obs = env.reset()
+def simulate(env, max_steps):
+    obs = env.reset()[0]
+    predictions = (0,)
 
     # Timesteps
-    for t in range(500):
+    for t in range(max_steps):
         # Bin the 4 observations. Since we don't know the limits of the observation, we just squash it
-        binnedObs = (sigmoid(obs * obsSquashScale) * (obsColumnSize - 1) + 0.5).astype(np.int).ravel().tolist()
+        binnedObs = (sigmoid(obs * obsSquashScale) * (obsColumnSize - 1) + 0.5).astype(np.int32).ravel().tolist()
 
-        h.step(cs, [ binnedObs, h.getPredictionCs(1) ], True, reward)
 
         # Retrieve the action, the hierarchy already automatically applied exploration
-        action = h.getPredictionCs(1)[0] # First and only column
+        action = predictions[0] # First and only column
 
-        obs, reward, done, info = env.step(action)
+        obs, reward, done, truncated, info = env.step(action)
 
         # Re-define reward so that it is 0 normally and then -1 if done
         if done:
@@ -81,6 +80,22 @@ for episode in range(1000):
 
             print("Episode {} finished after {} timesteps".format(episode + 1, t + 1))
 
-            break
         else:
             reward = 0.0
+
+        predictions = h.getPredictionCs(1)
+        h.step(cs, [ binnedObs, predictions ], True, reward)
+
+        if done:
+            break
+
+for episode in range(10000):
+    if episode%500==0:
+        env = gym.make('CartPole-v1', render_mode='human')
+    else:
+        env = gym.make('CartPole-v1')
+    simulate(env, max_steps=500)
+
+env = gym.make('CartPole-v1', render_mode='human')
+simulate(env, max_steps=2000)
+env.close()

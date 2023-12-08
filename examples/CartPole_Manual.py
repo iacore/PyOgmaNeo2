@@ -65,11 +65,7 @@ def simulate(env, max_steps):
 
     # Timesteps
     for t in range(max_steps):
-        # Bin the 4 observations. Since we don't know the limits of the observation, we just squash it
-        binnedObs = encode_obs(obs)
-        #(sigmoid(obs * obsSquashScale) * (obsColumnSize - 1) + 0.5).astype(np.int32).ravel().tolist()
-
-        h.step(cs, [ binnedObs, predictions ], True, 1/max_steps)
+        h.step(cs, [ encode_obs(obs), predictions ], True, 1/max_steps)
         predictions = h.getPredictionCs(1)
 
         # Retrieve the action, the hierarchy already automatically applied exploration
@@ -79,8 +75,7 @@ def simulate(env, max_steps):
 
         # punish (-1.0) when terminated
         if terminated:
-            #binnedObs = (sigmoid(obs * obsSquashScale) * (obsColumnSize - 1) + 0.5).astype(np.int32).ravel().tolist()
-            h.step(cs, [ binnedObs, predictions ], True, -1.0)
+            h.step(cs, [ encode_obs(obs), predictions ], True, -1.0)
 
             print("Episode {} finished after {} timesteps".format(episode + 1, t + 1))
             break

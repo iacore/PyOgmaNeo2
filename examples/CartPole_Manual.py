@@ -14,19 +14,12 @@ import pyogmaneo
 import gym
 import numpy as np
 
-# Squashing function
-def sigmoid(x):
-    return 1.0 / (1.0 + np.exp(-x))
-
 # Create the environment
 env = gym.make('CartPole-v1')
 
 # Get observation size
 numObs = env.observation_space.shape[0] # 4 values for Cart-Pole
 numActions = env.action_space.n # N actions (1 discrete value)
-
-# Squashing scale multiplier for observation
-obsSquashScale = 1.0
 
 # Define binning resolution
 obsColumnSize = 32
@@ -58,17 +51,26 @@ for i in range(2): # Layers with exponential memory. Not much memory is needed f
 # Create the hierarchy: Provided with input layer sizes (a single column in this case), and input types (a single predicted layer)
 h = pyogmaneo.Hierarchy(cs, [ pyogmaneo.Int3(1, numObs, obsColumnSize), pyogmaneo.Int3(1, 1, numActions) ], [ pyogmaneo.inputTypeNone, pyogmaneo.inputTypeAction ], lds)
 
+max_vals = np.zeros(4) + 0.1
+min_vals = np.zeros(4) - 0.1
+def encode_obs(obs):
+	max_vals[:] = np.maximum(obs, max_vals)
+	min_vals[:] = np.minimum(obs, min_vals)
+	return ((obs - min_vals) / (max_vals - min_vals) * (obsColumnSize - 1) + 0.5).astype(np.int32).tolist()
 
 def simulate(env, max_steps):
     obs = env.reset()[0]
 
+    predictions = h.getPredictionCs(1)
+
     # Timesteps
     for t in range(max_steps):
         # Bin the 4 observations. Since we don't know the limits of the observation, we just squash it
-        binnedObs = (sigmoid(obs * obsSquashScale) * (obsColumnSize - 1) + 0.5).astype(np.int32).ravel().tolist()
+        binnedObs = encode_obs(obs)
+        #(sigmoid(obs * obsSquashScale) * (obsColumnSize - 1) + 0.5).astype(np.int32).ravel().tolist()
 
-        predictions = h.getPredictionCs(1)
         h.step(cs, [ binnedObs, predictions ], True, 1/max_steps)
+        predictions = h.getPredictionCs(1)
 
         # Retrieve the action, the hierarchy already automatically applied exploration
         action = predictions[0] # First and only column
@@ -78,7 +80,7 @@ def simulate(env, max_steps):
         # punish (-1.0) when terminated
         if terminated:
             #binnedObs = (sigmoid(obs * obsSquashScale) * (obsColumnSize - 1) + 0.5).astype(np.int32).ravel().tolist()
-            h.step(cs, [ binnedObs, action ], True, -1.0)
+            h.step(cs, [ binnedObs, predictions ], True, -1.0)
 
             print("Episode {} finished after {} timesteps".format(episode + 1, t + 1))
             break

@@ -81,7 +81,7 @@ def simulate(env, max_steps):
             break
 
 for episode in range(10000):
-    if episode%500==0:
+    if episode%100==0:
         env = gym.make('CartPole-v1', render_mode='human')
     else:
         env = gym.make('CartPole-v1')
